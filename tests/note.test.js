@@ -81,3 +81,17 @@ test('buildNote omits published when unknown', () => {
   });
   assert.ok(!note.includes('published:'));
 });
+
+test('sanitizeFilename truncates by code point, never splitting an emoji', () => {
+  const out = sanitizeFilename('a'.repeat(119) + '😀 tail');
+  assert.doesNotThrow(() => encodeURIComponent(out));
+  assert.ok([...out].length <= 120);
+});
+
+test('sanitizeFilename strips leading dots so notes are not hidden', () => {
+  assert.equal(sanitizeFilename('.NET in 10 minutes'), 'NET in 10 minutes');
+});
+
+test('normalizeTags drops characters that are illegal in Obsidian tags / unsafe in YAML', () => {
+  assert.deepEqual(normalizeTags('*star, ai:, [x], @me, c++, área/sub_tag'), ['youtube', 'star', 'ai', 'x', 'me', 'c', 'área/sub_tag']);
+});

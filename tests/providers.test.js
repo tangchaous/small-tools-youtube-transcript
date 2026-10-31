@@ -23,3 +23,13 @@ for (const id of ['claude', 'chatgpt', 'kimi', 'deepseek']) {
     assert.deepEqual(JSON.parse(JSON.stringify(p)), p);
   });
 }
+
+test('kimi send button selectors never match a disabled send button', () => {
+  for (const sel of PROVIDERS.kimi.sendButton) assert.match(sel, /:not\(\.disabled\)|\[aria-label/);
+});
+
+test('providers without a stop indicator wait longer before treating a reply as done', () => {
+  for (const p of Object.values(PROVIDERS)) {
+    if (!p.stopButton.length) assert.ok(p.stableMs >= 5000, `${p.id}.stableMs`);
+  }
+});

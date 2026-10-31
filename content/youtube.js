@@ -84,23 +84,27 @@
     document.querySelector(PANEL)?.setAttribute('visibility', 'ENGAGEMENT_PANEL_VISIBILITY_HIDDEN');
   }
 
-  // Waits until the panel has segments and their count has stopped changing,
-  // so the whole transcript is collected before anything is sent.
-  async function collectPanel() {
+  const signature = (rows) => rows.slice(0, 5).map((r) => `${r.label} ${r.text}`).join('|');
+
+  // Waits until the panel has segments and their count has stopped changing, so the whole
+  // transcript is collected before anything is sent. Rows matching `staleSignature` (left over
+  // from a previously processed video) count as not loaded yet.
+  async function collectPanel(staleSignature = null) {
     const end = Date.now() + 20_000;
     let count = 0;
     let stableSince = Date.now();
     while (Date.now() < end) {
       await sleep(300);
-      const n = readPanel().length;
+      const rows = readPanel();
+      const n = staleSignature && signature(rows) === staleSignature ? 0 : rows.length;
       if (n !== count) {
         count = n;
         stableSince = Date.now();
       } else if (n > 0 && Date.now() - stableSince >= 1500) {
-        return readPanel();
+        return rows;
       }
     }
-    return readPanel();
+    return count ? readPanel() : [];
   }
 
   function pickTrack(tracks) {
@@ -126,15 +130,24 @@
     const pr = playerResponse(videoId);
     const meta = readMeta(pr);
 
-    let panel = readPanel();
-    if (!panel.length) {
-      const opened = await openPanel();
-      if (opened) {
-        panel = await collectPanel();
-        closePanel();
-      }
+    // The panel element survives in-app navigation, so rows we read for another video may still be
+    // in it. We tag the panel with the video it was read for and refuse to reuse foreign rows.
+    const panelEl = document.querySelector(PANEL);
+    const readFor = panelEl?.dataset.ytsVideo;
+    const stale = readFor && readFor !== videoId ? signature(readPanel()) : null;
+    const userOpened = panelEl?.getAttribute('visibility') === 'ENGAGEMENT_PANEL_VISIBILITY_EXPANDED';
+
+    let panel = [];
+    if (userOpened && !stale && readPanel().length) {
+      panel = await collectPanel();
+    } else if (await openPanel()) {
+      panel = await collectPanel(stale);
+      closePanel();
     }
-    if (panel.length) return { meta, panel };
+    if (panel.length) {
+      document.querySelector(PANEL)?.setAttribute('data-yts-video', videoId);
+      return { meta, panel };
+    }
 
     try {
       const json3 = await fetchCaptions(pr);

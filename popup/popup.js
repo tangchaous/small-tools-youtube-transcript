@@ -82,9 +82,10 @@ async function init() {
 
 $('#form').addEventListener('submit', async (e) => {
   e.preventDefault();
+  if ($('#run').disabled) return;
+  $('#run').disabled = true;
   const values = formValues();
   await saveLastUsed(values);
-  $('#run').disabled = true;
   const res = await chrome.runtime.sendMessage({ type: 'run', tabId: activeTab.id, ...values });
   if (!res?.ok) {
     render({ status: 'error', step: 'transcript', message: res?.error ?? 'Could not start.' });

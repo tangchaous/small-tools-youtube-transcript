@@ -34,10 +34,17 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   return false;
 });
 
+// In-memory guard, checked and set synchronously, so two quick clicks can't both pass the
+// storage check below before either job has written its "running" state.
+let busy = false;
+
 // Starts a job unless one is already running; resolves immediately so the popup isn't blocked.
 async function startJob(work) {
+  if (busy) return { ok: false, error: 'A summary is already in progress.' };
+  busy = true;
   const job = await getJob();
   if (job?.status === 'running' && Date.now() - job.updatedAt < STALE_JOB_MS) {
+    busy = false;
     return { ok: false, error: 'A summary is already in progress.' };
   }
   work().catch(async (err) => {
@@ -49,7 +56,7 @@ async function startJob(work) {
       message: err.message,
       canRetrySave: Boolean(await getLastResult()) && (err.step ?? prev?.step) === 'save',
     });
-  });
+  }).finally(() => { busy = false; });
   return { ok: true };
 }
 
