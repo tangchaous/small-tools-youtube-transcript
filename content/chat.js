@@ -10,6 +10,13 @@
   const chat = {
     state: { phase: 'idle' },
 
+    // Runs one completion check now. The service worker calls this on every poll, because the
+    // page itself is in a minimized window where Chrome throttles timers (down to once a minute
+    // after ~5 min hidden), which would otherwise delay noticing that the reply has finished.
+    tick() {
+      checkReply?.();
+    },
+
     async start(config, prompt) {
       chat.state = { phase: 'starting' };
       try {
@@ -124,26 +131,40 @@
     return markdown;
   }
 
-  async function waitForReply(config, before) {
+  // Set while a reply is being awaited; runs one completion check (from the page's own timer or
+  // from tick()) and settles the wait when the reply is complete or the deadline passes.
+  let checkReply = null;
+
+  function waitForReply(config, before) {
     const end = Date.now() + TIMEOUT_MS;
     let lastText = '';
     let stableSince = Date.now();
 
-    while (Date.now() < end) {
-      await sleep(500);
-      const messages = all(config.assistantMessage, config.exclude);
-      if (messages.length <= before) continue;
+    return new Promise((resolve, reject) => {
+      const settle = (fn, value) => {
+        checkReply = null;
+        clearInterval(timer);
+        fn(value);
+      };
+      checkReply = () => {
+        if (Date.now() > end) {
+          settle(reject, new Error(`Timed out after 5 minutes waiting for ${config.label}'s reply.`));
+          return;
+        }
+        const messages = all(config.assistantMessage, config.exclude);
+        if (messages.length <= before) return;
 
-      const latest = messages.at(-1);
-      const text = latest.innerText.trim();
-      if (text !== lastText) {
-        lastText = text;
-        stableSince = Date.now();
-        continue;
-      }
-      const generating = Boolean(first(config.stopButton));
-      if (text && !generating && Date.now() - stableSince >= config.stableMs) return latest;
-    }
-    throw new Error(`Timed out after 5 minutes waiting for ${config.label}'s reply.`);
+        const latest = messages.at(-1);
+        const text = latest.innerText.trim();
+        if (text !== lastText) {
+          lastText = text;
+          stableSince = Date.now();
+          return;
+        }
+        const generating = Boolean(first(config.stopButton));
+        if (text && !generating && Date.now() - stableSince >= config.stableMs) settle(resolve, latest);
+      };
+      const timer = setInterval(() => checkReply?.(), 500);
+    });
   }
 })();

@@ -5,7 +5,7 @@ A Chrome extension that takes the transcript of the YouTube video you're watchin
 note in the Obsidian vault and folder you pick.
 
 ```
-YouTube tab ──transcript──▶ chat tab (claude.ai / chatgpt.com / kimi.com / chat.deepseek.com)
+YouTube tab ──transcript──▶ hidden chat window (claude.ai / chatgpt.com / kimi.com / chat.deepseek.com)
                                   │ one message: prompt + whole transcript
                                   ▼
                            summary (Markdown) ──Local REST API──▶ Obsidian: <folder>/<Video title>.md
@@ -50,8 +50,10 @@ What happens:
 
 - The transcript is read from YouTube's **Show transcript** panel, falling back to the caption track.
   It is collected in full and cached for the browser session, so retries skip this step.
-- A new chat opens in the provider's tab. The prompt plus the **entire transcript** is pasted as one message
-  and sent. When the reply finishes, it's converted to Markdown, and focus returns to YouTube.
+- A new chat opens in a **minimized window** that you don't see, using your logged-in session. The prompt
+  plus the **entire transcript** is pasted as one message and sent. When the reply finishes, it's converted to
+  Markdown and the window closes itself. If something needs your attention (a login page, an error), that
+  window comes to the front instead. The conversation also remains in that site's chat history.
 - The note `<folder>/<Video title>.md` is created. If that name exists, `(2)`, `(3)`, … is appended,
   so existing notes are never overwritten.
 

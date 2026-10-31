@@ -83,7 +83,6 @@ async function runPipeline({ tabId, provider, vaultName, folder, tags }) {
   await setJob({ ...base, step: 'chat', title: video.meta.title, message: `Opening ${config.label}…` });
   const prompt = fillTemplate(settings.prompt, { ...video.meta, transcript: video.transcript });
   const summary = await summarizeInChat(config, prompt, { ...base, title: video.meta.title });
-  chrome.tabs.update(tabId, { active: true }).catch(() => {});
 
   const result = { meta: video.meta, provider: config.label, tags, summary, vaultName, folder };
   await saveLastResult(result);
@@ -154,11 +153,27 @@ const PHASE_MESSAGES = {
   waiting: (label) => `${label} is writing the summary…`,
 };
 
+// Runs the chat in a minimized window so it happens out of sight. On success the window is closed;
+// on failure it is brought to the front so the user can see why (e.g. a login page).
 async function summarizeInChat(config, prompt, jobBase) {
-  // Foreground tab: background tabs get throttled and some sites stop rendering the stream.
-  const chatTab = await chrome.tabs.create({ url: config.newChatUrl, active: true });
-  await waitForTabLoad(chatTab.id);
-  const target = { tabId: chatTab.id };
+  const win = await chrome.windows.create({ url: config.newChatUrl, state: 'minimized', focused: false });
+  const tabId = win.tabs[0].id;
+  // Hidden tabs can be discarded under memory pressure; this one must survive until the reply is in.
+  chrome.tabs.update(tabId, { autoDiscardable: false }).catch(() => {});
+
+  try {
+    const markdown = await driveChat(tabId, config, prompt, jobBase);
+    chrome.windows.remove(win.id).catch(() => {});
+    return markdown;
+  } catch (err) {
+    const shown = await chrome.windows.update(win.id, { state: 'normal', focused: true }).then(() => true, () => false);
+    throw new StepError('chat', shown ? `${err.message} (The ${config.label} window is now in front.)` : err.message);
+  }
+}
+
+async function driveChat(tabId, config, prompt, jobBase) {
+  await waitForTabLoad(tabId);
+  const target = { tabId };
 
   try {
     await chrome.scripting.executeScript({ target, files: ['lib/html2md.js', 'content/chat.js'] });
@@ -168,29 +183,36 @@ async function summarizeInChat(config, prompt, jobBase) {
       args: [config, prompt],
     });
   } catch (err) {
-    throw new StepError('chat', `Couldn't open ${config.label}: ${err.message}`);
+    throw new Error(`Couldn't open ${config.label}: ${err.message}`);
   }
 
-  // Polling also keeps the service worker alive while the reply streams.
+  // Polling keeps the service worker alive while the reply streams, and each poll also runs a
+  // completion check, since the minimized page's own timers are throttled.
   const end = Date.now() + CHAT_TIMEOUT_MS;
   let lastPhase = '';
   while (Date.now() < end) {
     await sleep(POLL_MS);
     let state;
     try {
-      [{ result: state }] = await chrome.scripting.executeScript({ target, func: () => window.__ytsChat?.state });
+      [{ result: state }] = await chrome.scripting.executeScript({
+        target,
+        func: () => {
+          window.__ytsChat?.tick();
+          return window.__ytsChat?.state;
+        },
+      });
     } catch {
-      throw new StepError('chat', `The ${config.label} tab was closed or navigated away before the reply finished.`);
+      throw new Error(`The ${config.label} window was closed or navigated away before the reply finished.`);
     }
-    if (!state) throw new StepError('chat', `The ${config.label} page reloaded before the reply finished. Try again.`);
+    if (!state) throw new Error(`The ${config.label} page reloaded before the reply finished. Try again.`);
     if (state.phase === 'done') return state.markdown;
-    if (state.phase === 'error') throw new StepError('chat', state.error);
+    if (state.phase === 'error') throw new Error(state.error);
     if (state.phase !== lastPhase && PHASE_MESSAGES[state.phase]) {
       lastPhase = state.phase;
       await setJob({ ...jobBase, step: 'chat', message: PHASE_MESSAGES[state.phase](config.label) });
     }
   }
-  throw new StepError('chat', `Timed out waiting for ${config.label}'s reply.`);
+  throw new Error(`Timed out waiting for ${config.label}'s reply.`);
 }
 
 async function saveToObsidian(result, jobBase) {
