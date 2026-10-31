@@ -4,9 +4,10 @@
 //   { meta, panel: [{ label, text }] }   from the "Show transcript" panel (preferred)
 //   { meta, json3: object }              from a caption track (fallback)
 //   { meta, error: string }
+//
+// Re-injecting always redefines window.__ytsYoutube, so a tab that was open while the extension
+// was updated picks up the new code instead of keeping the old copy.
 (() => {
-  if (window.__ytsYoutube) return;
-
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   // YouTube has shipped several transcript panels (old target-id, "PAmodern_transcript_view", and an
   // untagged one), so the transcript panel is whichever engagement panel actually holds segment rows.
@@ -64,14 +65,37 @@
 
   function readPanel() {
     const panel = transcriptPanel();
-    if (!panel) return [];
-    for (const v of SEGMENT_VARIANTS) {
-      const rows = [...panel.querySelectorAll(v.row)];
-      if (rows.length) {
-        return rows
-          .map((row) => ({ label: text(row.querySelector(v.label)), text: text(row.querySelector(v.text)) }))
-          .filter((s) => s.text);
+    if (panel) {
+      for (const v of SEGMENT_VARIANTS) {
+        const rows = [...panel.querySelectorAll(v.row)];
+        if (rows.length) {
+          return rows
+            .map((row) => ({ label: text(row.querySelector(v.label)), text: text(row.querySelector(v.text)) }))
+            .filter((s) => s.text);
+        }
       }
+    }
+    return genericRows();
+  }
+
+  const STAMP = /^\d{1,2}(:\d{2}){1,2}$/;
+  const SPOKEN_DURATION = /^(\d+ (hours?|minutes?|seconds?),? ?)+/;
+
+  // Layout-independent fallback for transcript markup we don't know yet: in an open panel, every
+  // leaf element whose text is a timestamp starts a row; the row's remaining text is the segment.
+  function genericRows() {
+    for (const panel of expandedPanels()) {
+      const rows = [];
+      for (const el of panel.querySelectorAll('*')) {
+        const label = text(el);
+        if (el.children.length || !STAMP.test(label)) continue;
+        let row = el.parentElement;
+        while (row && row !== panel && text(row) === label) row = row.parentElement;
+        if (!row || row === panel) continue;
+        const body = text(row).replace(label, '').trim().replace(SPOKEN_DURATION, '').trim();
+        if (body) rows.push({ label, text: body });
+      }
+      if (rows.length >= 3) return rows;
     }
     return [];
   }
@@ -90,14 +114,14 @@
     }
     if (button) {
       button.click();
-      return true;
+      return 'button';
     }
     const panel = document.querySelector(KNOWN_PANEL);
     if (panel) {
       panel.setAttribute('visibility', EXPANDED);
-      return true;
+      return 'panel';
     }
-    return false;
+    return '';
   }
 
   const expandedPanels = () => new Set([...document.querySelectorAll(PANELS)].filter((p) => p.getAttribute('visibility') === EXPANDED));
@@ -140,14 +164,23 @@
     return inLang(manual) || manual[0] || inLang(auto) || auto[0] || null;
   }
 
+  // Resolves to { json3 } or { reason } explaining why no captions could be downloaded.
   async function fetchCaptions(pr) {
-    const tracks = pr?.captions?.playerCaptionsTracklistRenderer?.captionTracks ?? [];
+    if (!pr) return { reason: 'player data unavailable' };
+    const tracks = pr.captions?.playerCaptionsTracklistRenderer?.captionTracks ?? [];
     const track = pickTrack(tracks);
-    if (!track) return null;
-    const res = await fetch(`${track.baseUrl}&fmt=json3`, { credentials: 'include' });
-    const body = await res.text();
-    if (!res.ok || !body.trim()) return null;
-    return JSON.parse(body);
+    if (!track) return { reason: 'video lists no caption tracks' };
+    try {
+      const res = await fetch(`${track.baseUrl}&fmt=json3`, { credentials: 'include' });
+      const body = await res.text();
+      if (!res.ok) return { reason: `HTTP ${res.status}` };
+      // YouTube answers an empty body when it requires tokens only its own player has.
+      if (!body.trim()) return { reason: `blocked by YouTube (${tracks.length} track(s) listed)` };
+      const json3 = JSON.parse(body);
+      return json3.events?.length ? { json3 } : { reason: 'caption track was empty' };
+    } catch (err) {
+      return { reason: err.message };
+    }
   }
 
   async function extract() {
@@ -163,11 +196,13 @@
     const userOpened = panelEl?.getAttribute('visibility') === EXPANDED;
 
     let panel = [];
+    let opened = userOpened ? 'already open' : '';
     if (userOpened && !stale && readPanel().length) {
       panel = await collectPanel();
     } else {
       const before = expandedPanels();
-      if (await openPanel()) {
+      opened = await openPanel();
+      if (opened) {
         panel = await collectPanel(stale);
         closePanelsOpenedSince(before);
       }
@@ -177,12 +212,17 @@
       return { meta, panel };
     }
 
-    try {
-      const json3 = await fetchCaptions(pr);
-      if (json3?.events?.length) return { meta, json3 };
-    } catch { /* fall through to the error below */ }
+    const captions = await fetchCaptions(pr);
+    if (captions.json3) return { meta, json3: captions.json3 };
 
-    return { meta, error: 'This video has no transcript or captions available.' };
+    const panelDetail = opened
+      ? `transcript panel opened (${opened}) but no lines were recognized`
+      : 'no "Show transcript" button found';
+    return {
+      meta,
+      error: `Couldn't get this video's transcript: ${panelDetail}; caption download: ${captions.reason}. ` +
+        'If YouTube shows a transcript for this video, reload the YouTube tab and try again.',
+    };
   }
 
   window.__ytsYoutube = { extract };
