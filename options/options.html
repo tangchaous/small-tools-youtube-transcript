@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>YouTube → Obsidian Summarizer · Options</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <main>
+    <h1>YouTube → Obsidian Summarizer</h1>
+
+    <section>
+      <h2>Obsidian vaults</h2>
+      <p class="hint">
+        Install the <b>Local REST API</b> community plugin in each vault, then copy its API key here.
+        Use <code>http://127.0.0.1:27123</code> after turning on <i>Enable Non-encrypted (HTTP) Server</i>
+        in the plugin settings, or <code>https://127.0.0.1:27124</code> if you have trusted the plugin's certificate.
+        The plugin writes to whichever vault it runs in, so each vault needs its own key (and port, if several
+        vaults are open at once). Name each profile exactly like the vault so "Open in Obsidian" links work.
+      </p>
+      <div id="vaults"></div>
+      <button id="add-vault" type="button">+ Add vault</button>
+    </section>
+
+    <section>
+      <h2>Defaults</h2>
+      <label>Default provider
+        <select id="default-provider"></select>
+      </label>
+      <label>Default tags <span class="hint">(comma-separated; <code>youtube</code> is always added)</span>
+        <input id="default-tags" type="text">
+      </label>
+    </section>
+
+    <section>
+      <h2>Summary prompt</h2>
+      <p class="hint">
+        Placeholders: <code>{{title}}</code>, <code>{{channel}}</code>, <code>{{url}}</code>,
+        <code>{{published}}</code>, <code>{{transcript}}</code>. The whole prompt is sent as a single message.
+      </p>
+      <textarea id="prompt" rows="18" spellcheck="false"></textarea>
+      <button id="reset-prompt" type="button" class="secondary">Reset to default</button>
+    </section>
+
+    <div class="actions">
+      <button id="save" type="button">Save</button>
+      <span id="saved" class="status"></span>
+    </div>
+  </main>
+
+  <template id="vault-row">
+    <div class="vault">
+      <label>Vault name <input data-field="name" type="text" placeholder="My Vault"></label>
+      <label>REST API URL <input data-field="baseUrl" type="text" placeholder="http://127.0.0.1:27123"></label>
+      <label>API key <input data-field="apiKey" type="password" placeholder="paste from Settings → Local REST API"></label>
+      <div class="row-actions">
+        <button type="button" data-action="test" class="secondary">Test connection</button>
+        <button type="button" data-action="remove" class="danger">Remove</button>
+        <span class="status" data-role="status"></span>
+      </div>
+    </div>
+  </template>
+
+  <script type="module" src="options.js"></script>
+</body>
+</html>
