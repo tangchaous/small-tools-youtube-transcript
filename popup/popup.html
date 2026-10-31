@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <h1>Summarize to Obsidian</h1>
+    <button id="open-options" class="icon" type="button" title="Options">⚙</button>
+  </header>
+
+  <p id="no-vaults" class="notice" hidden>
+    No Obsidian vault set up yet. <a href="#" id="setup-link">Open options</a> to add one.
+  </p>
+
+  <form id="form">
+    <label>Summarize with
+      <select id="provider"></select>
+    </label>
+    <label>Vault
+      <select id="vault"></select>
+    </label>
+    <label>Folder <span class="hint" id="folder-hint"></span>
+      <input id="folder" type="text" list="folders" placeholder="e.g. Inbox/YouTube (empty = vault root)" autocomplete="off">
+      <datalist id="folders"></datalist>
+    </label>
+    <label>Tags <span class="hint">comma-separated</span>
+      <input id="tags" type="text" placeholder="ai, productivity" autocomplete="off">
+    </label>
+    <button id="run" type="submit">Summarize &amp; Save</button>
+    <p id="page-hint" class="hint" hidden>Open a YouTube video (youtube.com/watch?v=…) to use this.</p>
+  </form>
+
+  <section id="job" hidden>
+    <p id="job-title" class="job-title"></p>
+    <ol class="steps">
+      <li data-step="transcript">Transcript</li>
+      <li data-step="chat">Summary</li>
+      <li data-step="save">Obsidian</li>
+    </ol>
+    <p id="job-message" class="message"></p>
+    <div class="job-actions">
+      <button id="open-note" type="button" hidden>Open in Obsidian</button>
+      <button id="retry-save" type="button" class="secondary" hidden>Retry save</button>
+      <button id="copy-summary" type="button" class="secondary" hidden>Copy summary</button>
+    </div>
+  </section>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

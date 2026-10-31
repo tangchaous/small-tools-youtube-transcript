@@ -1,0 +1,40 @@
+:root {
+  --bg: #fff; --text: #1d1d1f; --muted: #6b6b72; --border: #dcdce1; --field: #f7f7f8;
+  --accent: #7c3aed; --danger: #c62828; --ok: #2e7d32;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #1c1c1f; --text: #ececf1; --muted: #a1a1aa; --border: #3a3a40; --field: #26262a; }
+}
+* { box-sizing: border-box; }
+body { width: 340px; margin: 0; padding: 14px 16px 16px; background: var(--bg); color: var(--text); font: 13px/1.45 system-ui, sans-serif; }
+header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+h1 { font-size: 15px; margin: 0; }
+label { display: block; margin: 10px 0; font-weight: 600; }
+input, select {
+  display: block; width: 100%; margin-top: 4px; padding: 7px 9px; font: inherit; font-weight: 400;
+  color: var(--text); background: var(--field); border: 1px solid var(--border); border-radius: 6px;
+}
+.hint { color: var(--muted); font-weight: 400; font-size: 12px; }
+button {
+  font: inherit; font-weight: 600; padding: 8px 12px; border-radius: 6px; cursor: pointer;
+  border: 1px solid var(--accent); background: var(--accent); color: #fff;
+}
+button:disabled { opacity: .5; cursor: default; }
+button.secondary { background: transparent; color: var(--accent); }
+button.icon { background: none; border: none; color: var(--muted); font-size: 16px; padding: 2px 6px; }
+#run { width: 100%; margin-top: 4px; }
+.notice { background: var(--field); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; }
+a { color: var(--accent); }
+#job { border-top: 1px solid var(--border); margin-top: 14px; padding-top: 10px; }
+.job-title { font-weight: 600; margin: 0 0 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.steps { display: flex; gap: 6px; list-style: none; padding: 0; margin: 0 0 8px; }
+.steps li { flex: 1; text-align: center; font-size: 12px; padding: 4px 0; border-radius: 4px; background: var(--field); color: var(--muted); }
+.steps li.active { background: var(--accent); color: #fff; }
+.steps li.done { color: var(--ok); }
+.steps li.done::before { content: "✓ "; }
+.steps li.failed { background: var(--danger); color: #fff; }
+.message { margin: 0 0 8px; word-break: break-word; }
+.message.error { color: var(--danger); }
+.message.ok { color: var(--ok); }
+.job-actions { display: flex; gap: 6px; flex-wrap: wrap; }
