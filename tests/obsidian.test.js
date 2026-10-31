@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ObsidianClient, ObsidianError, notePath, normalizeFolder } from '../lib/obsidian.js';
+import { ObsidianClient, ObsidianError, notePath, normalizeFolder, sharedEndpoints } from '../lib/obsidian.js';
 
 // Fake fetch backed by an in-memory vault: { 'Inbox/a.md': '...' }.
 function fakeVault(files = {}, { apiKey = 'k' } = {}) {
@@ -92,4 +92,26 @@ test('listFolders recurses to the given depth and returns sorted folder paths', 
   });
   const client = new ObsidianClient({ baseUrl: 'http://127.0.0.1:27123', apiKey: 'k', fetch: v.fetch });
   assert.deepEqual(await client.listFolders(2), ['Inbox', 'Inbox/YouTube', 'Projects', 'Projects/X']);
+});
+
+test('401 message points at the shared-port cause', async () => {
+  const v = fakeVault();
+  const client = new ObsidianClient({ baseUrl: 'http://127.0.0.1:27123', apiKey: 'wrong', fetch: v.fetch });
+  await assert.rejects(client.putNote('Inbox', 'Video', 'x'), (e) => /same port/.test(e.message));
+});
+
+test('sharedEndpoints groups vault profiles that point at the same host:port', () => {
+  assert.deepEqual(
+    sharedEndpoints([
+      { name: 'A', baseUrl: 'http://127.0.0.1:27123' },
+      { name: 'B', baseUrl: 'http://127.0.0.1:27123/' },
+      { name: 'C', baseUrl: 'http://127.0.0.1:27125' },
+      { name: 'D', baseUrl: 'http://localhost:27123' },
+    ]),
+    [['A', 'B', 'D']]
+  );
+});
+
+test('sharedEndpoints ignores unparseable URLs', () => {
+  assert.deepEqual(sharedEndpoints([{ name: 'A', baseUrl: 'nope' }, { name: 'B', baseUrl: 'nope' }]), []);
 });

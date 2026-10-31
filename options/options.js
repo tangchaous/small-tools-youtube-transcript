@@ -1,6 +1,6 @@
 import { PROVIDERS, PROVIDER_IDS } from '../lib/providers.js';
 import { DEFAULT_PROMPT } from '../lib/prompt.js';
-import { ObsidianClient } from '../lib/obsidian.js';
+import { ObsidianClient, sharedEndpoints } from '../lib/obsidian.js';
 import { getSettings, saveSettings } from '../lib/storage.js';
 
 const $ = (sel) => document.querySelector(sel);
@@ -64,6 +64,14 @@ async function save() {
     defaultProvider: $('#default-provider').value,
     defaultTags: $('#default-tags').value.trim(),
   });
+  const shared = sharedEndpoints(vaults);
+  if (shared.length) {
+    saved.className = 'status error';
+    saved.textContent =
+      `Saved, but ${shared.map((g) => g.join(' & ')).join('; ')} use the same port. Only one of them is reachable ` +
+      'while both vaults are open; give each vault its own port in Settings → Local REST API.';
+    return;
+  }
   saved.className = 'status ok';
   saved.textContent = 'Saved ✓';
   setTimeout(() => { saved.textContent = ''; }, 2000);

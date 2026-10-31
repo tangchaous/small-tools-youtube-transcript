@@ -22,8 +22,9 @@ In each vault you want to save to:
    Alternatively, keep HTTPS (`27124`) and trust the plugin's certificate in your OS keychain.
 3. Copy the **API Key**.
 
-The plugin serves whichever vault it runs in. If you keep several vaults open at once, give each one a
-different port in its plugin settings.
+The plugin serves whichever vault it runs in. **If you keep several vaults open at once, give each one a
+different port** (for example 27123 and 27125). Otherwise only the first vault opened gets the port, and
+saves to the other vault fail with "rejected the API key". The options page warns when two vaults share a port.
 
 ### 2. Load the extension
 
@@ -82,7 +83,7 @@ tags:
 | Message | What to do |
 |---|---|
 | *Obsidian not reachable at …* | Open Obsidian, enable the plugin and its HTTP server, and check the URL/port. |
-| *Obsidian rejected the API key* | Re-copy the key from the plugin settings into Options. |
+| *… rejected the API key* | Usually two open vaults share a port, so a different vault answered. Give each vault its own port. Otherwise, re-copy the key. |
 | *Not logged in to …* / *Couldn't find …'s message box* | Log in to that site in this Chrome profile. If you are logged in, the site's layout changed (see below). |
 | *This video has no transcript or captions available* | The video has no captions; nothing to summarize. |
 | *Timed out waiting for …'s reply* | Very long videos on slow models can exceed 5 minutes. Retry, or pick a faster model in that site's UI. |
