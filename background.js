@@ -64,15 +64,35 @@ async function runPipeline({ tabId, provider, vaultName, folder, tags }) {
   const settings = await getSettings();
   const config = PROVIDERS[provider];
   if (!config) throw new StepError('transcript', `Unknown provider "${provider}".`);
-  findVault(settings, vaultName);
+  const vault = findVault(settings, vaultName);
   const base = { status: 'running', provider: config.label, canRetrySave: false };
 
-  // 1. Transcript (cached per video for the browser session).
-  await setJob({ ...base, step: 'transcript', message: 'Reading the transcript…' });
+  await setJob({ ...base, step: 'transcript', message: `Checking ${vault.name} for an existing note…` });
   const tab = await chrome.tabs.get(tabId);
   const videoId = watchVideoId(tab.url);
   if (!videoId) throw new StepError('transcript', 'Open a YouTube video page (youtube.com/watch?v=…) first.');
 
+  // 0. Duplicate check, before any transcript or chat work.
+  let existing;
+  try {
+    existing = await new ObsidianClient({ baseUrl: vault.baseUrl, apiKey: vault.apiKey }).findVideoNotes(videoId);
+  } catch (err) {
+    throw new StepError('transcript', `Couldn't check ${vault.name} for an existing note: ${err.message}`);
+  }
+  if (existing.length) {
+    const more = existing.length > 1 ? ` (and ${existing.length - 1} more)` : '';
+    await setJob({
+      ...base,
+      status: 'duplicate',
+      title: tab.title?.replace(/ - YouTube$/, ''),
+      message: `Already saved in ${vault.name}: ${existing[0]}${more}. Nothing was summarized.`,
+      obsidianUrl: obsidianOpenUrl(vault.name, existing[0]),
+    });
+    return;
+  }
+
+  // 1. Transcript (cached per video for the browser session).
+  await setJob({ ...base, step: 'transcript', message: 'Reading the transcript…' });
   let video = await getCachedTranscript(videoId);
   if (!video) {
     video = await extractTranscript(tabId);
@@ -241,6 +261,10 @@ async function saveToObsidian(result, jobBase) {
     step: 'save',
     title: result.meta.title,
     message: `Saved to ${vault.name}: ${path}`,
-    obsidianUrl: `obsidian://open?vault=${encodeURIComponent(vault.name)}&file=${encodeURIComponent(path)}`,
+    obsidianUrl: obsidianOpenUrl(vault.name, path),
   });
+}
+
+function obsidianOpenUrl(vaultName, path) {
+  return `obsidian://open?vault=${encodeURIComponent(vaultName)}&file=${encodeURIComponent(path)}`;
 }

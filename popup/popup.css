@@ -1,10 +1,10 @@
 :root {
   --bg: #fff; --text: #1d1d1f; --muted: #6b6b72; --border: #dcdce1; --field: #f7f7f8;
-  --accent: #7c3aed; --danger: #c62828; --ok: #2e7d32;
+  --accent: #7c3aed; --danger: #c62828; --ok: #2e7d32; --warn: #b26a00;
   color-scheme: light dark;
 }
 @media (prefers-color-scheme: dark) {
-  :root { --bg: #1c1c1f; --text: #ececf1; --muted: #a1a1aa; --border: #3a3a40; --field: #26262a; }
+  :root { --bg: #1c1c1f; --text: #ececf1; --muted: #a1a1aa; --border: #3a3a40; --field: #26262a; --warn: #f0b429; }
 }
 * { box-sizing: border-box; }
 body { width: 340px; margin: 0; padding: 14px 16px 16px; background: var(--bg); color: var(--text); font: 13px/1.45 system-ui, sans-serif; }
@@ -37,4 +37,5 @@ a { color: var(--accent); }
 .message { margin: 0 0 8px; word-break: break-word; }
 .message.error { color: var(--danger); }
 .message.ok { color: var(--ok); }
+.message.warn { color: var(--warn); }
 .job-actions { display: flex; gap: 6px; flex-wrap: wrap; }

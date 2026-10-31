@@ -48,6 +48,9 @@ Log in to whichever of claude.ai, chatgpt.com, kimi.com, and chat.deepseek.com y
 
 What happens:
 
+- First, the chosen vault is searched for a note about this video: a `video_id` property equal to the
+  video's ID, or a `url` property containing it. If one exists, the extension stops before reading the
+  transcript or opening the chat, and the popup shows the existing note with an **Open existing note** button.
 - The transcript is read from YouTube's **Show transcript** panel, falling back to the caption track.
   It is collected in full and cached for the browser session, so retries skip this step.
 - A new chat opens in a **minimized window** that you don't see, using your logged-in session. The prompt

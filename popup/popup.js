@@ -40,7 +40,10 @@ function render(job) {
   $('#job').hidden = !job;
   if (!job) return;
 
+  const duplicate = job.status === 'duplicate';
   $('#job-title').textContent = job.title ?? '';
+  // A duplicate stops before any step runs, so no step is marked.
+  $('.steps').hidden = duplicate;
   const current = STEPS.indexOf(job.step);
   for (const li of document.querySelectorAll('.steps li')) {
     const i = STEPS.indexOf(li.dataset.step);
@@ -51,12 +54,14 @@ function render(job) {
   }
   const message = $('#job-message');
   message.textContent = job.message ?? '';
-  message.className = `message ${job.status === 'error' ? 'error' : job.status === 'done' ? 'ok' : ''}`;
+  const tone = { error: 'error', done: 'ok', duplicate: 'warn' }[job.status] ?? '';
+  message.className = `message ${tone}`;
 
-  $('#open-note').hidden = !(job.status === 'done' && job.obsidianUrl);
+  $('#open-note').hidden = !((job.status === 'done' || duplicate) && job.obsidianUrl);
+  $('#open-note').textContent = duplicate ? 'Open existing note' : 'Open in Obsidian';
   $('#retry-save').hidden = !(job.status === 'error' && job.canRetrySave);
   getLastResult().then((r) => {
-    $('#copy-summary').hidden = !r || running;
+    $('#copy-summary').hidden = !r || running || duplicate;
   });
 }
 

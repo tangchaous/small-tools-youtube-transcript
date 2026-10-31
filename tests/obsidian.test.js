@@ -115,3 +115,35 @@ test('sharedEndpoints groups vault profiles that point at the same host:port', (
 test('sharedEndpoints ignores unparseable URLs', () => {
   assert.deepEqual(sharedEndpoints([{ name: 'A', baseUrl: 'nope' }, { name: 'B', baseUrl: 'nope' }]), []);
 });
+
+test('findVideoNotes sends a vault-wide JsonLogic query on video_id and url, returns paths', async () => {
+  let seen;
+  const fetch = async (url, opts) => {
+    seen = { url, ...opts };
+    return { ok: true, status: 200, json: async () => [{ filename: 'Inbox/A.md', result: true }, { filename: 'Old/B.md', result: true }] };
+  };
+  const client = new ObsidianClient({ baseUrl: 'http://127.0.0.1:27123', apiKey: 'k', fetch });
+  assert.deepEqual(await client.findVideoNotes('dQw4w9WgXcQ'), ['Inbox/A.md', 'Old/B.md']);
+  assert.equal(seen.url, 'http://127.0.0.1:27123/search/');
+  assert.equal(seen.method, 'POST');
+  assert.equal(seen.headers['Content-Type'], 'application/vnd.olrapi.jsonlogic+json');
+  assert.equal(seen.headers.Authorization, 'Bearer k');
+  assert.deepEqual(JSON.parse(seen.body), {
+    or: [
+      { '==': [{ var: 'frontmatter.video_id' }, 'dQw4w9WgXcQ'] },
+      { in: ['dQw4w9WgXcQ', { var: 'frontmatter.url' }] },
+    ],
+  });
+});
+
+test('findVideoNotes returns [] when nothing matches', async () => {
+  const fetch = async () => ({ ok: true, status: 200, json: async () => [] });
+  const client = new ObsidianClient({ baseUrl: 'http://x', apiKey: 'k', fetch });
+  assert.deepEqual(await client.findVideoNotes('abc'), []);
+});
+
+test('findVideoNotes surfaces search failures instead of reporting "no duplicate"', async () => {
+  const fetch = async () => ({ ok: false, status: 400, json: async () => ({ message: 'bad' }) });
+  const client = new ObsidianClient({ baseUrl: 'http://x', apiKey: 'k', fetch });
+  await assert.rejects(client.findVideoNotes('abc'), (e) => e instanceof ObsidianError && /HTTP 400/.test(e.message));
+});
