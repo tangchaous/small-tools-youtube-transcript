@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "YouTube → Obsidian Summarizer",
+  "version": "0.1.0",
+  "description": "Summarize a YouTube transcript with your logged-in Claude, ChatGPT, Kimi, or DeepSeek, and save it to Obsidian.",
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "Summarize this video to Obsidian",
+    "default_icon": { "16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png", "128": "icons/icon128.png" }
+  },
+  "icons": { "16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png", "128": "icons/icon128.png" },
+  "options_page": "options/options.html",
+  "background": { "service_worker": "background.js", "type": "module" },
+  "permissions": ["scripting", "storage", "tabs", "activeTab"],
+  "host_permissions": [
+    "https://www.youtube.com/*",
+    "https://claude.ai/*",
+    "https://chatgpt.com/*",
+    "https://www.kimi.com/*",
+    "https://kimi.com/*",
+    "https://chat.deepseek.com/*",
+    "http://127.0.0.1/*",
+    "https://127.0.0.1/*",
+    "http://localhost/*",
+    "https://localhost/*"
+  ]
+}
