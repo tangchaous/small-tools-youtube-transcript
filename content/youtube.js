@@ -8,10 +8,18 @@
   if (window.__ytsYoutube) return;
 
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-  const PANEL = 'ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-searchable-transcript"]';
+  // YouTube has shipped several transcript panels (old target-id, "PAmodern_transcript_view", and an
+  // untagged one), so the transcript panel is whichever engagement panel actually holds segment rows.
+  const PANELS = 'ytd-engagement-panel-section-list-renderer';
+  const KNOWN_PANEL = `${PANELS}[target-id="engagement-panel-searchable-transcript"]`;
+  const EXPANDED = 'ENGAGEMENT_PANEL_VISIBILITY_EXPANDED';
   const SEGMENT_VARIANTS = [
+    {
+      row: 'transcript-segment-view-model',
+      label: '.ytwTranscriptSegmentViewModelTimestamp, [class*="Timestamp"]:not([class*="A11y"])',
+      text: 'span[role="text"], [class*="SegmentText"]',
+    },
     { row: 'ytd-transcript-segment-renderer', label: '.segment-timestamp', text: '.segment-text' },
-    { row: 'transcript-segment-view-model', label: '[class*="Timestamp"]', text: '[class*="SegmentText"], span[role="text"]' },
   ];
 
   const text = (el) => (el?.textContent ?? '').replace(/\s+/g, ' ').trim();
@@ -42,8 +50,20 @@
     };
   }
 
+  function transcriptPanel() {
+    let best = null;
+    let bestRows = 0;
+    for (const panel of document.querySelectorAll(PANELS)) {
+      for (const v of SEGMENT_VARIANTS) {
+        const n = panel.querySelectorAll(v.row).length;
+        if (n > bestRows) [best, bestRows] = [panel, n];
+      }
+    }
+    return best ?? document.querySelector(KNOWN_PANEL);
+  }
+
   function readPanel() {
-    const panel = document.querySelector(PANEL);
+    const panel = transcriptPanel();
     if (!panel) return [];
     for (const v of SEGMENT_VARIANTS) {
       const rows = [...panel.querySelectorAll(v.row)];
@@ -72,16 +92,21 @@
       button.click();
       return true;
     }
-    const panel = document.querySelector(PANEL);
+    const panel = document.querySelector(KNOWN_PANEL);
     if (panel) {
-      panel.setAttribute('visibility', 'ENGAGEMENT_PANEL_VISIBILITY_EXPANDED');
+      panel.setAttribute('visibility', EXPANDED);
       return true;
     }
     return false;
   }
 
-  function closePanel() {
-    document.querySelector(PANEL)?.setAttribute('visibility', 'ENGAGEMENT_PANEL_VISIBILITY_HIDDEN');
+  const expandedPanels = () => new Set([...document.querySelectorAll(PANELS)].filter((p) => p.getAttribute('visibility') === EXPANDED));
+
+  // Hides only the panels that were opened after `before` was taken, i.e. the ones we opened.
+  function closePanelsOpenedSince(before) {
+    for (const panel of expandedPanels()) {
+      if (!before.has(panel)) panel.setAttribute('visibility', 'ENGAGEMENT_PANEL_VISIBILITY_HIDDEN');
+    }
   }
 
   const signature = (rows) => rows.slice(0, 5).map((r) => `${r.label} ${r.text}`).join('|');
@@ -132,20 +157,23 @@
 
     // The panel element survives in-app navigation, so rows we read for another video may still be
     // in it. We tag the panel with the video it was read for and refuse to reuse foreign rows.
-    const panelEl = document.querySelector(PANEL);
+    const panelEl = transcriptPanel();
     const readFor = panelEl?.dataset.ytsVideo;
     const stale = readFor && readFor !== videoId ? signature(readPanel()) : null;
-    const userOpened = panelEl?.getAttribute('visibility') === 'ENGAGEMENT_PANEL_VISIBILITY_EXPANDED';
+    const userOpened = panelEl?.getAttribute('visibility') === EXPANDED;
 
     let panel = [];
     if (userOpened && !stale && readPanel().length) {
       panel = await collectPanel();
-    } else if (await openPanel()) {
-      panel = await collectPanel(stale);
-      closePanel();
+    } else {
+      const before = expandedPanels();
+      if (await openPanel()) {
+        panel = await collectPanel(stale);
+        closePanelsOpenedSince(before);
+      }
     }
     if (panel.length) {
-      document.querySelector(PANEL)?.setAttribute('data-yts-video', videoId);
+      transcriptPanel()?.setAttribute('data-yts-video', videoId);
       return { meta, panel };
     }
 
